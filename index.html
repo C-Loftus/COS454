@@ -60,9 +60,10 @@
   timeline = timeline.concat(INSTRUCTIONS_SKIP);
   timeline = timeline.concat(INSTRUCTIONS);
   timeline = timeline.concat(READY_01);
-  timeline = timeline.concat(TWO_STEP_TASK.slice(0,100));
+  // The numbers in here should specify how long the task will be
+  timeline = timeline.concat(TWO_STEP_TASK.slice(0,   10));
   timeline = timeline.concat(READY_02);
-  timeline = timeline.concat(TWO_STEP_TASK.slice(100,201));
+  timeline = timeline.concat(TWO_STEP_TASK.slice(   10,   20));
   timeline = timeline.concat(FINISHED);
 
   jsPsych.init({
@@ -71,13 +72,15 @@
     exclusions: {min_width: 600, min_height: 500},
     on_finish: function() {
 
-      // Add interactions to the data variable
+      // Add interactions to the data  1
       var interaction_data = jsPsych.data.getInteractionData();
       jsPsych.data.get().addToLast({interactions: interaction_data.json()});
 
       // Display jsPsych data in viewport.
-      jsPsych.data.displayData();
-
+      // jsPsych.data.displayData();
+      alert('The experiment data will be exported as a CSV. Please download it, save it, and send it via email to us.')
+      jsPsych.data.get().localSave('csv','mydata.csv');
+      
     }
   })
 

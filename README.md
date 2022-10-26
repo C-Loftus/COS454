@@ -1,5 +1,8 @@
 # Two-step
 
+### Customize for the experiment
+  `const instructions_04` defines the final experiment instructions
+
 Author(s): Sam Zorowitz, Gili Karni, Branson Byers
 
 A space-themed version of the two-step task.
