@@ -340,13 +340,6 @@ jsPsych.plugins["two-step-trial"] = (function() {
         screen_resolution: screen_resolution,
         minimum_resolution: minimum_resolution
       };
-      console.log(trial_data);
-      // store the data as a jsPsych data object
-      // jsPsych.data.write(trial_data);
-      // console.log(jsPsych.data.get().csv());
-
-
-
 
       // clear the display
       display_element.innerHTML = '';
