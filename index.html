@@ -79,7 +79,15 @@
       // Display jsPsych data in viewport.
       // jsPsych.data.displayData();
       alert('The experiment data will now be exported as a CSV. Please download it, save it, and send it via email to us.')
-      jsPsych.data.get().localSave('csv','experiment_report.csv');
+      
+      // get current time
+      var date = new Date();
+      // get UTC timestamp
+      var timestamp = date.getTime();
+     
+
+      var filename = 'experiment_report' + timestamp + '.csv';
+      jsPsych.data.get().localSave('csv', filename);
       
     }
   })
