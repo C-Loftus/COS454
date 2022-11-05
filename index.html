@@ -61,9 +61,9 @@
   timeline = timeline.concat(INSTRUCTIONS);
   timeline = timeline.concat(READY_01);
   // The numbers in here should specify how long the task will be
-  timeline = timeline.concat(TWO_STEP_TASK.slice(0,   10));
+  timeline = timeline.concat(TWO_STEP_TASK.slice(0, 75));
   timeline = timeline.concat(READY_02);
-  timeline = timeline.concat(TWO_STEP_TASK.slice(   10,   20));
+  timeline = timeline.concat(TWO_STEP_TASK.slice(75,150));
   timeline = timeline.concat(FINISHED);
 
   jsPsych.init({
@@ -78,8 +78,8 @@
 
       // Display jsPsych data in viewport.
       // jsPsych.data.displayData();
-      alert('The experiment data will be exported as a CSV. Please download it, save it, and send it via email to us.')
-      jsPsych.data.get().localSave('csv','mydata.csv');
+      alert('The experiment data will now be exported as a CSV. Please download it, save it, and send it via email to us.')
+      jsPsych.data.get().localSave('csv','experiment_report.csv');
       
     }
   })
