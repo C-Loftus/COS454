@@ -84,9 +84,15 @@
       var date = new Date();
       // get UTC timestamp
       var timestamp = date.getTime();
-     
+    //  check if it is day or night
+      var hours = date.getHours();
+      var day_night = 'day';
+      if (hours < 6 || hours > 7) {
+        day_night = 'night';
+      }
 
-      var filename = 'experiment_report' + timestamp + '.csv';
+
+      var filename = 'experiment_report-' + day_night + "-" + timestamp + '.csv';
       jsPsych.data.get().localSave('csv', filename);
       
     }
