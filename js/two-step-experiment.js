@@ -198,7 +198,7 @@ var READY_02 = {
 const instructions_04 = {
   type: 'two-step-instructions',
   pages: [
-    "<p>Great job! You've finished the task.</p><p>The experiment data will be exported as a CSV. Please download it, save it, and send it via email to us by responding to the email where you first recieved instructions. </p>",
+    "<p>Great job! You've finished the task.</p><p>The experiment data will be exported as a CSV. Make sure to not exit out from the download screen. </p><p> Please download it, save it, and send it via email to us by responding to the email where you first recieved instructions. </p>",
   ]
 }
 
