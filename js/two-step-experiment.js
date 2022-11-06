@@ -178,7 +178,7 @@ var READY_01 = {
   pages: [
     "<p>Great job! You've finished the instructions.</p><p>We'll get started with the real game now.</p>",
     "<p>In the real game, you will see new planets, aliens, and rocket ships.</p><p>However, the rules of the game <b>have not changed</b>.</p>",
-    "Get ready to begin <b>Block 1/2</b>. It will take ~8 minutes.<br>Press next when you're ready to start.",
+    "Get ready to begin <b>Block 1/2</b>. It will take ~5 minutes.<br>Press next when you're ready to start.",
   ]
 }
 
@@ -186,7 +186,7 @@ var READY_02 = {
   type: 'two-step-instructions',
   pages: [
     "Take a break for a few moments and press any button when you are ready to continue.",
-    "Get ready to begin <b>Block 2/2</b>. It will take ~8 minutes.<br>Press next when you're ready to start.",
+    "Get ready to begin <b>Block 2/2</b>. It will take ~5 minutes.<br>Press next when you're ready to start.",
   ]
 }
 
@@ -198,7 +198,7 @@ var READY_02 = {
 const instructions_04 = {
   type: 'two-step-instructions',
   pages: [
-    "<p>Great job! You've finished the task.</p><p>The experiment data will be exported as a CSV. Make sure to not exit out from the download screen. </p><p> Please download it, save it, and send it via email to us by responding to the email where you first recieved instructions. </p>",
+    "<p>Great job! You've finished the task.After a final quiz on the next page, the experiment data will be exported as a CSV.</p><p> Make sure to not exit out from the download screen. </p><p> Please download it, save it, and send it via email to us by responding to the email where you first recieved instructions. </p>",
   ]
 }
 
