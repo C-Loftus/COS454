@@ -94,7 +94,7 @@
 
       var filename = 'experiment_report-' + day_night + "-" + timestamp + '.csv';
       jsPsych.data.get().localSave('csv', filename);
-      
+      jsPsych.data.displayData();
     }
   })
 
