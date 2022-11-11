@@ -20,97 +20,107 @@ setwd("./")
 # sample_data = read.csv("data/2/experiment_report-day-1667774775005.csv")
 # sample_data = read.csv("data/1/experiment_report-day-1667677166294.csv")
 
-sample_data = read.csv("data/1/experiment_report-night-1667701658903.csv")
+sample_data <- read.csv("data/1/experiment_report-night-1667701658903.csv")
 
-relevant_data = sample_data  %>% select(state_1_choice, transition, outcome)
+relevant_data <- sample_data %>% select(state_1_choice, transition, outcome)
 
-relevant_data = relevant_data %>% slice(5:n())
+relevant_data <- relevant_data %>% slice(5:n())
 ```
 
 ```{r}
 # Note: transition == 0 refers to the rare transition
 # Note: transition == 1 refers to the common transition
 
-relevant_data_table = data.table(relevant_data)
-relevant_data_table  =  relevant_data_table[, next_state_choice := state_1_choice]
+relevant_data_table <- data.table(relevant_data)
+relevant_data_table <- relevant_data_table[, next_state_choice := state_1_choice]
 
-shifted_data =  relevant_data_table[, state_1_choice := shift(state_1_choice)]
-shifted_data =  relevant_data_table[, transition:= shift(transition)]
-shifted_data =  relevant_data_table[, outcome := shift(outcome)]
+shifted_data <- relevant_data_table[, state_1_choice := shift(state_1_choice)]
+shifted_data <- relevant_data_table[, transition := shift(transition)]
+shifted_data <- relevant_data_table[, outcome := shift(outcome)]
 
-shifted_df = data.frame(shifted_data[2:nrow(shifted_data) - 2, ])
+shifted_df <- data.frame(shifted_data[2:nrow(shifted_data) - 2, ])
+shifted_df <- shifted_df %>% mutate(stay = state_1_choice == next_state_choice)
+```
+    
+```{r} 
 
-
-# think this can do all of the code below in one line
-# we can make this into a fn eventually for all the csvs
-count_df = shifted_df %>% group_by(state_1_choice, transition, outcome, next_state_choice) %>% summarise(count = n())
+count_df <- shifted_df %>%
+    group_by(stay, transition, outcome) %>%
+    summarise(count = n(), .groups = "drop")
 count_df
 #############################################
 
-ct_r_s = count_df %>% dplyr::filter(state_1_choice == 0, transition == 1, outcome == 1, next_state_choice==0)  %>% select(count)
-ct_r_s  %>% pull(count)  %>% sum()
+prob_df <- count_df %>%
+    group_by(transition, outcome) %>%
+    mutate(total = sum(count)) %>%
+    ungroup() %>%
+    group_by(transition, outcome) %>%
+    mutate(prob = count / total) %>%
+    ungroup()
+prob_df
+```
 
+```{r}
+sumDecisionType <- function(df, stay, outcome, commonTransition) {
+    return(sum(df$stay == stay & df$outcome == outcome & df$transition == commonTransition, na.rm = TRUE))
+}
+```
+
+
+```{r}
 # Common Transition, Rewarded, Stay
-ct_r_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1))
-
+ct_r_s <- sumDecisionType(shifted_df, stay = TRUE, outcome = 1, commonTransition = 1)
 
 # Common Transition, Rewarded, Leave
-ct_r_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0))
+ct_r_l <- sumDecisionType(shifted_df, stay = FALSE, outcome = 1, commonTransition = 1)
 
 # Rare Transition, Rewarded, Stay
-rt_r_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1))
+rt_r_s <- sumDecisionType(shifted_df, stay = TRUE, outcome = 1, commonTransition = 0)
 
 # Rare Transition, Rewarded, Leave
-rt_r_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0))
+rt_r_l <- sumDecisionType(shifted_df, stay = FALSE, outcome = 1, commonTransition = 0)
 
 # Common Transition, Unrewarded, Stay
-ct_ur_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1))
+ct_ur_s <- sumDecisionType(shifted_df, stay = TRUE, outcome = 0, commonTransition = 1)
 
 # Common Transition, Unrewarded, Leave
-ct_ur_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0))
+ct_ur_l <- sumDecisionType(shifted_df, stay = FALSE, outcome = 0, commonTransition = 1)
 
 # Rare Transition, Unrewarded, Stay
-rt_ur_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1))
+rt_ur_s <- sumDecisionType(shifted_df, stay = TRUE, outcome = 0, commonTransition = 0)
 
 # Rare Transition, Unrewarded, Leave
-rt_ur_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0))
-
-# Need: number of times prev choice 1 and s2 0 and reward and chose 1 again
-# Need: number of times prev choice 1 and s2 0 and no reward and chose 1 again
-# Need: number of times prev choice 0 and s2 1 and reward and chose 0 again
-# Need: number of times prev choice 0 and s2 1 and no reward and chose 0 again
+rt_ur_l <- sumDecisionType(shifted_df, stay = FALSE, outcome = 0, commonTransition = 0)
 ```
 
 ```{r}
-b1 = ct_r_s / (ct_r_s + ct_r_l)
-b2 = rt_r_s / (rt_r_s + rt_r_l)
+b1 <- ct_r_s / (ct_r_s + ct_r_l)
+b2 <- rt_r_s / (rt_r_s + rt_r_l)
 
-b3 = ct_ur_s / (ct_ur_s + ct_ur_l)
-b4 = rt_ur_s / (rt_ur_s + rt_ur_l)
+b3 <- ct_ur_s / (ct_ur_s + ct_ur_l)
+b4 <- rt_ur_s / (rt_ur_s + rt_ur_l)
 ```
 
 ```{r}
-reward_type <- c(rep("rewarded" , 2) , rep("unrewarded" , 2) )
-transition <- rep(c("common", "rare") , 2)
+reward_type <- c(rep("rewarded", 2), rep("unrewarded", 2))
+transition <- rep(c("common", "rare"), 2)
 value <- c(b1, b2, b3, b4)
-data <- data.frame(reward_type,condition,value)
+data <- data.frame(reward_type, transition, value)
 
-ggplot(data, aes(fill=condition, y=value, x=reward_type)) + 
-    geom_bar(position="dodge", stat="identity")
+ggplot(data, aes(fill = transition, y = value, x = reward_type)) +
+    geom_bar(position = "dodge", stat = "identity")
 ```
 
 ```{r}
 # create logistic regression model
 
-# adds a column to see if we are staying, just to make the boolean check easy for the logistic model
-finaldf <- shifted_df  %>% mutate(stay = state_1_choice == next_state_choice) 
-
 # drops all NA rows that would be an issue for the model
-finaldf <- finaldf[complete.cases(finaldf), ]
+finaldf <- shifted_df[complete.cases(shifted_df), ]
 finaldf
 
-mod = glm(stay ~ outcome* transition, data=finaldf, family = binomial)
+mod <- glm(stay ~ outcome * transition, data = finaldf, family = binomial)
+mod
+
 # plot the model
 plot(mod)
 ```
-
