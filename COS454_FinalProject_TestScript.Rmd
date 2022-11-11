@@ -1,0 +1,93 @@
+---
+title: "COS454_FinalProject_TestScript"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rlang)
+library(dplyr)
+library("data.table")
+library(ggplot2)
+```
+
+```{r}
+# sample_data = read.csv("~/Desktop/CognitiveModeling/data/2/experiment_report-day-1667774775005.csv")
+
+# sample_data = read.csv("~/Desktop/CognitiveModeling/data/1/experiment_report-day-1667677166294.csv")
+
+sample_data = read.csv("~/Desktop/CognitiveModeling/data/1/experiment_report-night-1667701658903.csv")
+
+relevant_data = sample_data  %>% select(state_1_choice, transition, outcome)
+
+relevant_data = relevant_data %>% slice(5:n())
+```
+
+```{r}
+# Note: transition == 0 refers to the rare transition
+# Note: transition == 1 refers to the common transition
+
+relevant_data_table = data.table(relevant_data)
+relevant_data_table  =  relevant_data_table[, next_state_choice := state_1_choice]
+
+shifted_data =  relevant_data_table[, state_1_choice := shift(state_1_choice)]
+shifted_data =  relevant_data_table[, transition:= shift(transition)]
+shifted_data =  relevant_data_table[, outcome := shift(outcome)]
+
+shifted_df = data.frame(shifted_data[2:nrow(shifted_data) - 2, ])
+
+# Common Transition, Rewarded, Stay
+ct_r_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1))
+
+# Common Transition, Rewarded, Leave
+ct_r_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0))
+
+# Rare Transition, Rewarded, Stay
+rt_r_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1))
+
+# Rare Transition, Rewarded, Leave
+rt_r_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 1 & shifted_df$next_state_choice == 0))
+
+# Common Transition, Unrewarded, Stay
+ct_ur_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1))
+
+# Common Transition, Unrewarded, Leave
+ct_ur_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 1  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0))
+
+# Rare Transition, Unrewarded, Stay
+rt_ur_s = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1))
+
+# Rare Transition, Unrewarded, Leave
+rt_ur_l = length(which(shifted_df$state_1_choice == 0 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 1)) + length(which(shifted_df$state_1_choice == 1 & shifted_df$transition == 0  & shifted_df$outcome == 0 & shifted_df$next_state_choice == 0))
+
+# Need: number of times prev choice 1 and s2 0 and reward and chose 1 again
+# Need: number of times prev choice 1 and s2 0 and no reward and chose 1 again
+# Need: number of times prev choice 0 and s2 1 and reward and chose 0 again
+# Need: number of times prev choice 0 and s2 1 and no reward and chose 0 again
+```
+
+```{r}
+b1 = ct_r_s / (ct_r_s + ct_r_l)
+b2 = rt_r_s / (rt_r_s + rt_r_l)
+
+b3 = ct_ur_s / (ct_ur_s + ct_ur_l)
+b4 = rt_ur_s / (rt_ur_s + rt_ur_l)
+```
+
+```{r}
+reward_type <- c(rep("rewarded" , 2) , rep("undrewarded" , 2) )
+transition <- rep(c("common", "rare") , 2)
+value <- c(b1, b2, b3, b4)
+data <- data.frame(reward_type,condition,value)
+
+ggplot(data, aes(fill=condition, y=value, x=reward_type)) + 
+    geom_bar(position="dodge", stat="identity")
+```
+
+```{r}
+# logistic regression
+# lm(stay ~ r*T)
+```
