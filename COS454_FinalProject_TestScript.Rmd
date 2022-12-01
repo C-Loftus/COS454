@@ -119,8 +119,33 @@ finaldf <- shifted_df[complete.cases(shifted_df), ]
 finaldf
 
 mod <- glm(stay ~ outcome * transition, data = finaldf, family = binomial)
-mod
-
-# plot the model
-plot(mod)
+mod %>% summary()
 ```
+
+# Paired T-Test for Morning vs Evening Trials
+Read in all the csvs and split them into morning and evening trials
+
+```{r}
+tirednessMapping <- jsonlite::fromJSON("data/sleepiness.json")$meta
+
+allCsvs <- list.files("data", pattern = "*.csv", full.names = TRUE, recursive = TRUE)
+allCsvs
+allNight <- all_csvs[grep("night", all_csvs)] %>%
+    lapply(read.csv)
+allDay <- all_csvs[grep("day", all_csvs)] %>% lapply(read.csv)
+
+all_people <- list.files("data", pattern="", full.names = TRUE, recursive = FALSE)  
+all_people <- all_people[!grepl("json", all_people)]
+
+```
+
+```{r}
+library(lme4)
+# Use linear mixed effects model to combine all subjects into one regression
+
+
+# -> see if there’s effect of tiredness on model-based versus model-free weights at the group level
+```
+
+<!-- Notes: code common transitions as 1, rare as -1 in order to get favorable logistic regression properties. (Do same for reward) -->
+<!-- Notes: center tiredness as another interaction term with -1 , 1 -->
