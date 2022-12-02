@@ -1,0 +1,116 @@
+```{r}
+library(purrr)
+library(readr)
+library(jsonlite)
+library("data.table")
+library(dplyr)
+setwd("./")
+library(magrittr)
+```
+
+```{r}
+class(cars)
+debug = list(cars, cars)
+# debug = data.frame(debug)
+debug
+```
+
+```{r}
+
+surveyResponseToVal <- jsonlite::fromJSON("data/sleepiness.json")$meta
+preprocess <- function(csv, surveyString) {
+    # print(surveyString)
+    # surveyResponseToVal[surveyString][[1]]  %>% print()
+
+    relevant_data <- csv %>%
+        dplyr::filter(trial_type == "two-step-trial") %>%
+        select(state_1_choice, transition, outcome) %>%
+        dplyr::filter(!grepl("null", state_1_choice)) %>%
+        dplyr::filter(!grepl("null", transition)) %>%
+        dplyr::filter(!grepl("null", outcome)) %>%
+        mutate(next_state1_choice = lead(state_1_choice, 1)) %>%
+        mutate(stay = state_1_choice == next_state1_choice) %>%
+        mutate(tiredness = surveyResponseToVal[surveyString][[1]])  %>% 
+        as.data.frame()
+    # TO DO: make outcome -1/1, make transition -1/1
+    return(relevant_data)
+}
+```
+
+
+```{r}
+
+allData <- list()
+
+for (person in list.files("data/")) {
+    if (!grepl("json", person)) {
+        surveyResponseMap <- jsonlite::fromJSON(paste0("data/", person, "/meta.json"))$meta
+        morningFirst <- surveyResponseMap$first == "morning"
+        for (csv in list.files(paste0("data/", person, "/"))) {
+            if (!grepl("json", csv)) {
+                csvIsMorning <- grepl("day", csv)
+                if (csvIsMorning && morningFirst | !csvIsMorning && !morningFirst) {
+                    surveyResponse <- surveyResponseMap["form1"]
+                } else {
+                    surveyResponse <- surveyResponseMap["form2"]
+                }
+
+                readInCsv <- read_csv(paste0("data/", person, "/", csv))
+                processedCSV <- preprocess(readInCsv, surveyResponse[[1]])
+                allData[[length(allData) + 1]] <- processedCSV
+            }
+        }
+    }
+}
+```
+    
+```{r}
+```
+    
+```{r}
+
+# read in all data
+allPaths <- list.files("data", pattern = "experiment_report-day-1669484810263.csv", full.names = TRUE, recursive = TRUE) %>% purrr::map(read_csv)
+
+allData <- allPaths %>% purrr::map(preprocess, "Feeling active, vital, alert, or wide awake")
+allData
+```
+    
+```{r}
+# Logistic Regression Model: Predicting stay (selecting the same stage 1 choice as the previous round)
+# based on outcome (rewarded/unrewarded) and transition (common/rare)
+
+preprocess <- function(trial_data) {
+    stay_pred_mod <- glm(stay ~ outcome * transition, data = trial_data, family = binomial)
+    print(coef(stay_pred_mod))
+    # stay_pred_mod %>% summary()
+    # TO DO: Create a new Data Table with each row contatining all regression coefficients as well as morning vs. evening
+}
+```
+
+
+```{r}
+# Logistic Regression Model: Predicting stay (selecting the same stage 1 choice as the previous round)
+# based on outcome (rewarded/unrewarded), transition (common/rare), AND sleepiness score
+preprocess <- function(trial_data) {
+    stay_pred_mod <- glm(stay ~ outcome * transition * tiredness, data = trial_data, family = binomial)
+}
+```
+
+```{r}
+# Paired T-Test Between Morning/Evening Conditions
+
+# Check that the difference btwn conditions follows a normal distribution
+# compute the difference
+diff <- with(
+    my_data,
+    weight[group == "before"] - weight[group == "after"]
+)
+# Shapiro-Wilk normality test for the differences
+shapiro.test(diff) # => p-value = FILL_IN
+
+before <- mice2$before
+after <- mice2$after
+# Compute t-test
+res <- t.test(before, after, paired = TRUE)
+```

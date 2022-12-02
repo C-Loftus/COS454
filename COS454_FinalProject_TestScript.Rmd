@@ -130,12 +130,25 @@ tirednessMapping <- jsonlite::fromJSON("data/sleepiness.json")$meta
 
 allCsvs <- list.files("data", pattern = "*.csv", full.names = TRUE, recursive = TRUE)
 allCsvs
-allNight <- all_csvs[grep("night", all_csvs)] %>%
+
+allNight <- allCsvs[grep("night", allCsvs)] %>%
     lapply(read.csv)
-allDay <- all_csvs[grep("day", all_csvs)] %>% lapply(read.csv)
+allDay <- allCsvs[grep("day", allCsvs)] %>% lapply(read.csv)
 
 all_people <- list.files("data", pattern = "", full.names = TRUE, recursive = FALSE)
 all_people <- all_people[!grepl("json", all_people)]
+
+# for every person, get their morning and evening trials
+all_people  %>% 
+    lapply(function(person) {
+        person_night <- allNight[grepl(person, allNight)]
+        person_day <- allDay[grepl(person, allDay)]
+        return(list(night = person_night, day = person_day))
+    }) -> all_people_trials
+
+```
+
+```{r}
 ```
 
 ```{r}
