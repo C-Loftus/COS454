@@ -134,9 +134,8 @@ allNight <- all_csvs[grep("night", all_csvs)] %>%
     lapply(read.csv)
 allDay <- all_csvs[grep("day", all_csvs)] %>% lapply(read.csv)
 
-all_people <- list.files("data", pattern="", full.names = TRUE, recursive = FALSE)  
+all_people <- list.files("data", pattern = "", full.names = TRUE, recursive = FALSE)
 all_people <- all_people[!grepl("json", all_people)]
-
 ```
 
 ```{r}
