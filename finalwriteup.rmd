@@ -24,16 +24,17 @@ preprocess <- function(csv, surveyString, isMorning, personID) {
         mutate(tiredness = surveyResponseToVal[surveyString][[1]]) %>%
         mutate(isMorning = isMorning) %>%
         dplyr::filter(!is.na(next_state1_choice)) %>%
+        # mutate(outcome = ifelse(outcome == 0, -1, outcome)) %>%
+        # mutate(transition = ifelse(transition == 0, -1, transition)) %>%
         as.data.frame()
 
     attr(relevant_data, "isMorning") <- isMorning
     attr(relevant_data, "personID") <- personID
+    # attr(relevant_data, "tiredness") <- surveyResponseToVal[surveyString][[1]]
 
-    # TO DO: make outcome -1/1, make transition -1/1
     return(relevant_data)
 }
 ```
-
 
 ```{r}
 
@@ -61,18 +62,17 @@ for (person in list.files("data/")) {
 }
 ```
 
-    
-    
+# Create Logistic Regression and Store Coefficients
 ```{r}
 # Logistic Regression Model: Predicting stay (selecting the same stage 1 choice as the previous round)
 # based on outcome (rewarded/unrewarded) and transition (common/rare)
 
 logisticRegressionStay <- function(trial_data) {
     stay_pred_mod <- glm(stay ~ outcome * transition, data = trial_data, family = binomial)
-    names(stay_pred_mod$coefficients) <- c("Intercept", "outcome", "transition", "outcome:transition")
-    return(coef(stay_pred_mod))
-    # stay_pred_mod %>% summary()
-    # TO DO: Create a new Data Table with each row contatining all regression coefficients as well as morning vs. evening
+
+    res = append(stay_pred_mod$coefficients, trial_data$tiredness[1])
+    names(res) <- c("Intercept", "outcome", "transition", "outcome:transition", "tiredness")
+    return(res)
 }
 
 morningCoefList <- allData %>%
@@ -82,6 +82,8 @@ eveningCoefList <- allData %>%
     list.filter(attr(., "isMorning") == FALSE) %>%
     map(logisticRegressionStay)
 
+allCoefList <- append(morningCoefList, eveningCoefList)
+
 
 morningOutcome <- c()
 eveningOutcome <- c()
@@ -89,7 +91,8 @@ morningTransition <- c()
 eveningTransition <- c()
 morningInteraction <- c()
 eveningInteraction <- c()
-
+morningTiredness <- c()
+eveningTiredness <- c()
 
 # pull a specific column for each dataframe in the list
 for (i in 1:length(morningCoefList)) {
@@ -99,32 +102,46 @@ for (i in 1:length(morningCoefList)) {
     eveningTransition <- c(eveningTransition, eveningCoefList[[i]][["transition"]])
     morningInteraction <- c(morningInteraction, morningCoefList[[i]][["outcome:transition"]])
     eveningInteraction <- c(eveningInteraction, eveningCoefList[[i]][["outcome:transition"]])
+    morningTiredness <- c(morningTiredness, morningCoefList[[i]][["tiredness"]])
+    eveningTiredness <- c(eveningTiredness, eveningCoefList[[i]][["tiredness"]])
 }
 ```
-    
+
+# Check for T Test: # It doesn't follow a normal distribution :/
+```{r}
+# Check that the difference btwn conditions follows a normal distribution
+# via the Shapiro-Wilk normality test
+canTestOutcome <- shapiro.test(morningOutcome - eveningOutcome)
+canTestTransition <- shapiro.test(morningTransition - eveningTransition)
+canTestInteraction <- shapiro.test(morningInteraction - eveningInteraction)
+```
+
+```{r}
+outcomeResult <- wilcox.test(morningOutcome, eveningOutcome, paired = TRUE)
+transitionResult <- wilcox.test(morningTransition, eveningTransition, paired = TRUE)
+# p-value = 0.03979 when 0/1
+interactionResult <- wilcox.test(morningInteraction, eveningInteraction, paired = TRUE)
+```
+
+```{r}
+allOutcome <- c(morningOutcome, eveningOutcome)
+allTransition <- c(morningTransition, eveningTransition)
+allInteraction <- c(morningInteraction, eveningInteraction)
+allTiredness <- c(morningTiredness, eveningTiredness)
+
+cor(allOutcome, allTiredness)
+cor(allTransition, allTiredness)
+cor(allInteraction, allTiredness)
+```
+
 
 ```{r}
 # Logistic Regression Model: Predicting stay (selecting the same stage 1 choice as the previous round)
 # based on outcome (rewarded/unrewarded), transition (common/rare), AND sleepiness score
 logisticRegressionStaySleepy <- function(trial_data) {
-    stay_pred_mod <- glm(stay ~ outcome * transition * tiredness, data = trial_data, family = binomial)
+    stay_pred_mod <- glm(stay ~ tiredness, data = trial_data, family = binomial)
 }
-```
 
-```{r}
-# Paired T-Test Between Morning/Evening Conditions
-
-# Check that the difference btwn conditions follows a normal distribution
-# compute the difference
-diff <- with(
-    my_data,
-    weight[group == "before"] - weight[group == "after"]
-)
-# Shapiro-Wilk normality test for the differences
-shapiro.test(diff) # => p-value = FILL_IN
-
-before <- mice2$before
-after <- mice2$after
-# Compute t-test
-res <- t.test(before, after, paired = TRUE)
+sleepyCoefs <- allData %>% map(logisticRegressionStaySleepy)
+sleepyCoefs
 ```
