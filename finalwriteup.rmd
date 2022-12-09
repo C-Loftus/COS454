@@ -7,25 +7,32 @@ library(dplyr)
 library(rlist)
 setwd("./")
 library(magrittr)
+library(lme4)
 ```
 
 ```{r}
 
 surveyResponseToVal <- jsonlite::fromJSON("data/sleepiness.json")$meta
-preprocess <- function(csv, surveyString, isMorning, personID) {
+preprocess <- function(csv, surveyString, isMorning, morningFirst, personID) {
     relevant_data <- csv %>%
         dplyr::filter(trial_type == "two-step-trial") %>%
         select(state_1_choice, transition, outcome) %>%
         dplyr::filter(!grepl("null", state_1_choice)) %>%
         dplyr::filter(!grepl("null", transition)) %>%
         dplyr::filter(!grepl("null", outcome)) %>%
+        mutate(state_1_choice = as.numeric(state_1_choice)) %>%
+        mutate(outcome = as.numeric(outcome)) %>%
         mutate(next_state1_choice = lead(state_1_choice, 1)) %>%
         mutate(stay = state_1_choice == next_state1_choice) %>%
         mutate(tiredness = surveyResponseToVal[surveyString][[1]]) %>%
         mutate(isMorning = isMorning) %>%
+        mutate(task_run = ((isMorning && morningFirst) || (isMorning && morningFirst))) %>%
+        mutate(isMorning = ifelse(isMorning == TRUE, 1, -1)) %>% # Do in one line with above???
+        mutate(task_run = ifelse(task_run == TRUE, 1, -1)) %>% # Do in one line with above???
+        mutate(subject = personID) %>%
         dplyr::filter(!is.na(next_state1_choice)) %>%
-        # mutate(outcome = ifelse(outcome == 0, -1, outcome)) %>%
-        # mutate(transition = ifelse(transition == 0, -1, transition)) %>%
+        mutate(outcome = ifelse(outcome == 0, -1, outcome)) %>%
+        mutate(transition = ifelse(transition == 0, -1, transition)) %>% # center around 0
         as.data.frame()
 
     attr(relevant_data, "isMorning") <- isMorning
@@ -54,12 +61,46 @@ for (person in list.files("data/")) {
                 }
 
                 readInCsv <- read_csv(paste0("data/", person, "/", csv))
-                processedCSV <- preprocess(readInCsv, surveyResponse[[1]], csvIsMorning, person)
+                processedCSV <- preprocess(readInCsv, surveyResponse[[1]], csvIsMorning, morningFirst, person)
                 allData[[length(allData) + 1]] <- processedCSV
             }
         }
     }
 }
+```
+
+```{r}
+allDataConcat <- bind_rows(allData)
+```
+
+# GLMER
+```{r}
+# Can remove some variables
+# random effects: per-subject
+# fixed effects: for group
+# outcome beta: model-free effect (win-stay, lose-shift effect)
+# outcome-transition interaction: model-based effect
+# show bar plot for everyone: compute proportions separately for each task run and then
+# average proportions together within person and then for entire group
+# Q1: is task replicating prior research? report outcome effect and out:trans effect (non-sig trend; in text)
+base_reg <- glmer(stay ~ outcome*transition + (1 | subject), data = allDataConcat, family = binomial)
+summary(base_reg)
+```
+
+# GLMER Controlling for Time of Day
+```{r}
+# strat to include every var as random effect and then prune higher order rand effects until model converged
+# run task run without morning stuff
+# make two sets of bar plots (task run 1 and task run 2; morning vs evening)
+tod_reg <- glmer(stay ~ outcome*transition*(task_run + isMorning) + (1 | subject), data = allDataConcat, family = binomial)
+summary(tod_reg)
+```
+
+# GLMER Controlling for Tiredness
+```{r}
+# Median split plot on the tiredness ratings (take all runs with low tiredness and make plot)
+tiredness_reg <- glmer(stay ~ outcome*transition*(task_run + tiredness) + (1 + (outcome*transition) || subject), data = allDataConcat, family = binomial)
+summary(tiredness_reg)
 ```
 
 # Create Logistic Regression and Store Coefficients
