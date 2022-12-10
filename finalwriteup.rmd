@@ -1,19 +1,30 @@
 ```{r}
+setwd("./")
+
 library(purrr)
 library(readr)
 library(jsonlite)
 library("data.table")
 library(dplyr)
 library(rlist)
-setwd("./")
 library(magrittr)
 library(lme4)
+library(plotrix)
 ```
 
 ```{r}
-
-surveyResponseToVal <- jsonlite::fromJSON("data/sleepiness.json")$meta
-preprocess <- function(csv, surveyString, isMorning, morningFirst, personID) {
+# Preprocess experiment data to extract relevant information: reward, 
+# transition, first state choice, tiredness, experimental condition (morning
+# vs evening), and task run (first or second time conducting the experiment).
+# Note 1: reward is coded as -1 (no reward) and 1 (reward), transition is coded as
+# -~0.7 (rare transition) and ~0.3 (common transition), tiredness is code on a
+# scale from -3 to 3, experimental condition is coded as 1 (morning) and -1
+# (evening) and task run as 1 (first run) and -1 (second run).
+# Note 2: "stay" is true when the participant selected the same first-stage 
+# choice in successive trials.
+# Note 3: all predictors are zero-centered.
+survey_response_to_val <- jsonlite::fromJSON("data/sleepiness.json")$meta
+preprocess <- function(csv, survey_string, is_morning, morning_first, person_id) {
     relevant_data <- csv %>%
         dplyr::filter(trial_type == "two-step-trial") %>%
         select(state_1_choice, transition, outcome) %>%
@@ -24,165 +35,201 @@ preprocess <- function(csv, surveyString, isMorning, morningFirst, personID) {
         mutate(outcome = as.numeric(outcome)) %>%
         mutate(next_state1_choice = lead(state_1_choice, 1)) %>%
         mutate(stay = state_1_choice == next_state1_choice) %>%
-        mutate(tiredness = surveyResponseToVal[surveyString][[1]]) %>%
-        mutate(isMorning = isMorning) %>%
-        mutate(task_run = ((isMorning && morningFirst) || (isMorning && morningFirst))) %>%
-        mutate(isMorning = ifelse(isMorning == TRUE, 1, -1)) %>% # Do in one line with above???
-        mutate(task_run = ifelse(task_run == TRUE, 1, -1)) %>% # Do in one line with above???
-        mutate(subject = personID) %>%
+        mutate(tiredness = survey_response_to_val[survey_string][[1]]) %>%
+        mutate(is_morning = is_morning) %>%
+        mutate(task_run = ((is_morning && morning_first) || (is_morning && morning_first))) %>%
+        mutate(is_morning = ifelse(is_morning == TRUE, 1, -1)) %>%
+        mutate(task_run = ifelse(task_run == TRUE, 1, -1)) %>%
+        mutate(subject = person_id) %>%
         dplyr::filter(!is.na(next_state1_choice)) %>%
         mutate(outcome = ifelse(outcome == 0, -1, outcome)) %>%
-        mutate(transition = ifelse(transition == 0, -1, transition)) %>% # center around 0
         as.data.frame()
 
-    attr(relevant_data, "isMorning") <- isMorning
-    attr(relevant_data, "personID") <- personID
-    # attr(relevant_data, "tiredness") <- surveyResponseToVal[surveyString][[1]]
-
+        attr(relevant_data, "is_morning") <- is_morning
+        attr(relevant_data, "task_run") <- (is_morning && morning_first) || (is_morning && morning_first)
+        attr(relevant_data, "tiredness") <- survey_response_to_val[survey_string][[1]]
+        
     return(relevant_data)
 }
 ```
 
 ```{r}
-
-allData <- list()
-
+all_data <- list()
+# Read in and preprocess experimental data.
 for (person in list.files("data/")) {
     if (!grepl("json", person)) {
-        surveyResponseMap <- jsonlite::fromJSON(paste0("data/", person, "/meta.json"))$meta
-        morningFirst <- surveyResponseMap$first == "morning"
+        survey_response_map <- jsonlite::fromJSON(paste0("data/", person, "/meta.json"))$meta
+        morning_first <- survey_response_map$first == "morning"
         for (csv in list.files(paste0("data/", person, "/"))) {
             if (!grepl("json", csv)) {
-                csvIsMorning <- grepl("day", csv)
-                if (csvIsMorning && morningFirst | !csvIsMorning && !morningFirst) {
-                    surveyResponse <- surveyResponseMap["form1"]
+                csv_is_morning <- grepl("day", csv)
+                if (csv_is_morning && morning_first | !csv_is_morning && !morning_first) {
+                    survey_response <- survey_response_map["form1"]
                 } else {
-                    surveyResponse <- surveyResponseMap["form2"]
+                    survey_response <- survey_response_map["form2"]
                 }
-
-                readInCsv <- read_csv(paste0("data/", person, "/", csv))
-                processedCSV <- preprocess(readInCsv, surveyResponse[[1]], csvIsMorning, morningFirst, person)
-                allData[[length(allData) + 1]] <- processedCSV
+                read_in_csv <- read_csv(paste0("data/", person, "/", csv))
+                processed_csv <- preprocess(read_in_csv, survey_response[[1]], csv_is_morning, morning_first, person)
+                all_data[[length(all_data) + 1]] <- processed_csv
             }
         }
     }
 }
+
+all_data_concat <- bind_rows(all_data) %>% mutate(transition = transition - mean(transition))
+all_data_concat
 ```
 
 ```{r}
-allDataConcat <- bind_rows(allData)
-```
-
-# GLMER
-```{r}
-# Can remove some variables
-# random effects: per-subject
-# fixed effects: for group
-# outcome beta: model-free effect (win-stay, lose-shift effect)
-# outcome-transition interaction: model-based effect
-# show bar plot for everyone: compute proportions separately for each task run and then
-# average proportions together within person and then for entire group
-# Q1: is task replicating prior research? report outcome effect and out:trans effect (non-sig trend; in text)
-base_reg <- glmer(stay ~ outcome*transition + (1 | subject), data = allDataConcat, family = binomial)
+# Mixed effect modeling illustrating random and fixed effects of outcome and
+# transition on stay.
+base_reg <- glmer(stay ~ outcome*transition + (1 | subject), data = all_data_concat, family = binomial)
 summary(base_reg)
 ```
 
-# GLMER Controlling for Time of Day
 ```{r}
-# strat to include every var as random effect and then prune higher order rand effects until model converged
-# run task run without morning stuff
-# make two sets of bar plots (task run 1 and task run 2; morning vs evening)
-tod_reg <- glmer(stay ~ outcome*transition*(task_run + isMorning) + (1 | subject), data = allDataConcat, family = binomial)
+# Mixed effect modeling illustrating random and fixed effects of outcome,
+# transition, task run, and time of day on stay.
+tod_reg <- glmer(stay ~ outcome*transition*(task_run + is_morning) + (1 | subject), data = all_data_concat, family = binomial)
 summary(tod_reg)
 ```
 
-# GLMER Controlling for Tiredness
 ```{r}
-# Median split plot on the tiredness ratings (take all runs with low tiredness and make plot)
-tiredness_reg <- glmer(stay ~ outcome*transition*(task_run + tiredness) + (1 + (outcome*transition) || subject), data = allDataConcat, family = binomial)
+# Mixed effect modeling illustrating random and fixed effects of outcome,
+# transition, task run, and tiredness on stay.
+tiredness_reg <- glmer(stay ~ outcome*transition*(task_run + tiredness) + (1 + (outcome*transition) || subject), data = all_data_concat, family = binomial)
 summary(tiredness_reg)
 ```
 
-# Create Logistic Regression and Store Coefficients
 ```{r}
-# Logistic Regression Model: Predicting stay (selecting the same stage 1 choice as the previous round)
-# based on outcome (rewarded/unrewarded) and transition (common/rare)
-
-logisticRegressionStay <- function(trial_data) {
-    stay_pred_mod <- glm(stay ~ outcome * transition, data = trial_data, family = binomial)
-
-    res = append(stay_pred_mod$coefficients, trial_data$tiredness[1])
-    names(res) <- c("Intercept", "outcome", "transition", "outcome:transition", "tiredness")
-    return(res)
+sum_decision_type <- function(df, stay, outcome, transition) {
+    return(sum(df$stay == stay & df$outcome == outcome & df$transition == transition))
 }
 
-morningCoefList <- allData %>%
-    list.filter(attr(., "isMorning") == TRUE) %>%
-    map(logisticRegressionStay)
-eveningCoefList <- allData %>%
-    list.filter(attr(., "isMorning") == FALSE) %>%
-    map(logisticRegressionStay)
+stay_probability_computer <- function(df) {
+  # Common Transition, Rewarded, Stay
+  ct_r_s <- sum_decision_type(df, stay = TRUE, outcome = 1, transition = 1)
+  
+  # Common Transition, Rewarded, Leave
+  ct_r_l <- sum_decision_type(df, stay = FALSE, outcome = 1, transition = 1)
+  
+  # Rare Transition, Rewarded, Stay
+  rt_r_s <- sum_decision_type(df, stay = TRUE, outcome = 1, transition = 0)
+  
+  # Rare Transition, Rewarded, Leave
+  rt_r_l <- sum_decision_type(df, stay = FALSE, outcome = 1, transition = 0)
+  
+  # Common Transition, Unrewarded, Stay
+  ct_ur_s <- sum_decision_type(df, stay = TRUE, outcome = -1, transition = 1)
+  
+  # Common Transition, Unrewarded, Leave
+  ct_ur_l <- sum_decision_type(df, stay = FALSE, outcome = -1, transition = 1)
+  
+  # Rare Transition, Unrewarded, Stay
+  rt_ur_s <- sum_decision_type(df, stay = TRUE, outcome = -1, transition = 0)
+  
+  # Rare Transition, Unrewarded, Leave
+  rt_ur_l <- sum_decision_type(df, stay = FALSE, outcome = -1, transition = 0)
+  
+  # Common Transition, Rewarded
+  b1 <- ct_r_s / (ct_r_s + ct_r_l)
+  # Rare Transition, Rewarded
+  b2 <- rt_r_s / (rt_r_s + rt_r_l)
+  # Common Transition, Unrewarded
+  b3 <- ct_ur_s / (ct_ur_s + ct_ur_l)
+  # Rare Transition, Unrewarded
+  b4 <- rt_ur_s / (rt_ur_s + rt_ur_l)
+  
+  res = c(b1, b2, b3, b4)
+  names(res) <- c("b1", "b2", "b3", "b4")
+  return(res)
+}
 
-allCoefList <- append(morningCoefList, eveningCoefList)
+bp_val_averger <- function(bp_vals) {
+  b1s <- c()
+  b2s <- c()
+  b3s <- c()
+  b4s <- c()
+  for (i in 1:length(bp_vals)) {
+    b1s <- c(b1s, bp_vals[[i]][["b1"]])
+    b2s <- c(b2s, bp_vals[[i]][["b2"]])
+    b3s <- c(b3s, bp_vals[[i]][["b3"]])
+    b4s <- c(b4s, bp_vals[[i]][["b4"]])
+  }
+  
+  b1_av <- mean(b1s)
+  b2_av <- mean(b2s)
+  b3_av <- mean(b3s)
+  b4_av <- mean(b4s)
+  
+  b1_stderr <- std.error(b1s)
+  b2_stderr <- std.error(b2s)
+  b3_stderr <- std.error(b3s)
+  b4_stderr <- std.error(b4s)
+  
+  return(c(b1_av, b2_av, b3_av, b4_av, b1_stderr, b2_stderr, b3_stderr, b4_stderr))
+}
 
-
-morningOutcome <- c()
-eveningOutcome <- c()
-morningTransition <- c()
-eveningTransition <- c()
-morningInteraction <- c()
-eveningInteraction <- c()
-morningTiredness <- c()
-eveningTiredness <- c()
-
-# pull a specific column for each dataframe in the list
-for (i in 1:length(morningCoefList)) {
-    morningOutcome <- c(morningOutcome, morningCoefList[[i]][["outcome"]])
-    eveningOutcome <- c(eveningOutcome, eveningCoefList[[i]][["outcome"]])
-    morningTransition <- c(morningTransition, morningCoefList[[i]][["transition"]])
-    eveningTransition <- c(eveningTransition, eveningCoefList[[i]][["transition"]])
-    morningInteraction <- c(morningInteraction, morningCoefList[[i]][["outcome:transition"]])
-    eveningInteraction <- c(eveningInteraction, eveningCoefList[[i]][["outcome:transition"]])
-    morningTiredness <- c(morningTiredness, morningCoefList[[i]][["tiredness"]])
-    eveningTiredness <- c(eveningTiredness, eveningCoefList[[i]][["tiredness"]])
+stay_bar_plot_creator <- function(bars_to_plot, title) {
+  reward_type <- c(rep("rewarded", 2), rep("unrewarded", 2))
+  transition <- rep(c("common", "rare"), 2)
+  value <- bars_to_plot[1:4]
+  se <- bars_to_plot[5:8]
+  data <- data.frame(reward_type, transition, value)
+  ggplot(data, aes(fill = transition, y = value, x = reward_type)) +
+      geom_bar(position = "dodge", stat = "identity") + 
+      labs(y= "Stay Probability", x = "Reward Condition", title = title) +
+      theme(plot.title = element_text(hjust = 0.5)) +
+      geom_errorbar(aes(ymin=value-se, ymax=value+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
 }
 ```
 
-# Check for T Test: # It doesn't follow a normal distribution :/
 ```{r}
-# Check that the difference btwn conditions follows a normal distribution
-# via the Shapiro-Wilk normality test
-canTestOutcome <- shapiro.test(morningOutcome - eveningOutcome)
-canTestTransition <- shapiro.test(morningTransition - eveningTransition)
-canTestInteraction <- shapiro.test(morningInteraction - eveningInteraction)
+morning_data <- all_data %>%
+    list.filter(attr(., "is_morning") == TRUE) %>%
+    map(stay_probability_computer)
+
+stay_bar_plot_creator(bp_val_averger(morning_data), "Stay Probability : Morning Condition")
 ```
 
 ```{r}
-outcomeResult <- wilcox.test(morningOutcome, eveningOutcome, paired = TRUE)
-transitionResult <- wilcox.test(morningTransition, eveningTransition, paired = TRUE)
-# p-value = 0.03979 when 0/1
-interactionResult <- wilcox.test(morningInteraction, eveningInteraction, paired = TRUE)
+evening_data <- all_data %>%
+    list.filter(attr(., "is_morning") == FALSE) %>%
+    map(stay_probability_computer)
+
+stay_bar_plot_creator(bp_val_averger(evening_data), "Stay Probability : Evening Condition")
 ```
 
 ```{r}
-allOutcome <- c(morningOutcome, eveningOutcome)
-allTransition <- c(morningTransition, eveningTransition)
-allInteraction <- c(morningInteraction, eveningInteraction)
-allTiredness <- c(morningTiredness, eveningTiredness)
+first_run_data <- all_data %>%
+    list.filter(attr(., "task_run") == TRUE) %>%
+    map(stay_probability_computer)
 
-cor(allOutcome, allTiredness)
-cor(allTransition, allTiredness)
-cor(allInteraction, allTiredness)
+stay_bar_plot_creator(bp_val_averger(first_run_data), "Stay Probability : First Task Run Condition")
 ```
 
+```{r}
+second_run_data <- all_data %>%
+    list.filter(attr(., "task_run") == FALSE) %>%
+    map(stay_probability_computer)
+
+stay_bar_plot_creator(bp_val_averger(second_run_data), "Stay Probability : Second Task Run Condition")
+```
 
 ```{r}
-# Logistic Regression Model: Predicting stay (selecting the same stage 1 choice as the previous round)
-# based on outcome (rewarded/unrewarded), transition (common/rare), AND sleepiness score
-logisticRegressionStaySleepy <- function(trial_data) {
-    stay_pred_mod <- glm(stay ~ tiredness, data = trial_data, family = binomial)
-}
+tired_data <- all_data %>%
+    list.filter(attr(., "tiredness") <= 0) %>%
+    map(stay_probability_computer)
 
-sleepyCoefs <- allData %>% map(logisticRegressionStaySleepy)
-sleepyCoefs
+stay_bar_plot_creator(bp_val_averger(tired_data), "Stay Probability : Tired Condition")
+```
+
+```{r}
+awake_data <- all_data %>%
+    list.filter(attr(., "tiredness") > 0) %>%
+    map(stay_probability_computer)
+
+stay_bar_plot_creator(bp_val_averger(awake_data), "Stay Probability : Awake Condition")
 ```
