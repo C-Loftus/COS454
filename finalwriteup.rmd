@@ -10,6 +10,7 @@ library(rlist)
 library(magrittr)
 library(lme4)
 library(plotrix)
+library(ggplot2)
 ```
 
 ```{r}
