@@ -49,6 +49,7 @@ preprocess <- function(csv, survey_string, is_morning, morning_first, person_id)
         attr(relevant_data, "is_morning") <- is_morning
         attr(relevant_data, "task_run") <- (is_morning && morning_first) || (is_morning && morning_first)
         attr(relevant_data, "tiredness") <- survey_response_to_val[survey_string][[1]]
+        attr(relevant_data, "subject") <- person_id
         
     return(relevant_data)
 }
@@ -185,6 +186,13 @@ stay_bar_plot_creator <- function(bars_to_plot, title) {
                   width=.2,                    # Width of the error bars
                   position=position_dodge(.9))
 }
+```
+
+```{r}
+all_data_processed <- all_data %>%
+    map(stay_probability_computer)
+               
+stay_bar_plot_creator(bp_val_averger(all_data_processed), "Stay Probability : All Data")
 ```
 
 ```{r}
