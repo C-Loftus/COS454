@@ -19,13 +19,14 @@ library(ggplot2)
 # vs evening), and task run (first or second time conducting the experiment).
 # Note 1: reward is coded as -1 (no reward) and 1 (reward), transition is coded as
 # -~0.7 (rare transition) and ~0.3 (common transition), tiredness is code on a
-# scale from -3 to 3, experimental condition is coded as 1 (morning) and -1
-# (evening) and task run as 1 (first run) and -1 (second run).
+# scale from -3 (least tired) to 3 (most tired), experimental condition is coded 
+# as 1 (morning) and -1 (evening) and task run as -1 (first run) and 1 
+# (second run).
 # Note 2: "stay" is true when the participant selected the same first-stage 
 # choice in successive trials.
 # Note 3: all predictors are zero-centered.
 survey_response_to_val <- jsonlite::fromJSON("data/sleepiness.json")$meta
-preprocess <- function(csv, survey_string, is_morning, morning_first, person_id) {
+preprocess <- function(csv, survey_string, is_morning, morning_first, is_more_tired_condition, person_id) {
     relevant_data <- csv %>%
         dplyr::filter(trial_type == "two-step-trial") %>%
         select(state_1_choice, transition, outcome) %>%
@@ -40,7 +41,7 @@ preprocess <- function(csv, survey_string, is_morning, morning_first, person_id)
         mutate(is_morning = is_morning) %>%
         mutate(task_run = ((is_morning && morning_first) || (is_morning && morning_first))) %>%
         mutate(is_morning = ifelse(is_morning == TRUE, 1, -1)) %>%
-        mutate(task_run = ifelse(task_run == TRUE, 1, -1)) %>%
+        mutate(task_run = ifelse(task_run == TRUE, -1, 1)) %>%
         mutate(subject = person_id) %>%
         dplyr::filter(!is.na(next_state1_choice)) %>%
         mutate(outcome = ifelse(outcome == 0, -1, outcome)) %>%
@@ -50,6 +51,7 @@ preprocess <- function(csv, survey_string, is_morning, morning_first, person_id)
         attr(relevant_data, "task_run") <- (is_morning && morning_first) || (is_morning && morning_first)
         attr(relevant_data, "tiredness") <- survey_response_to_val[survey_string][[1]]
         attr(relevant_data, "subject") <- person_id
+        attr(relevant_data, "is_more_tired_condition") <- is_more_tired_condition
         
     return(relevant_data)
 }
@@ -67,11 +69,13 @@ for (person in list.files("data/")) {
                 csv_is_morning <- grepl("day", csv)
                 if (csv_is_morning && morning_first | !csv_is_morning && !morning_first) {
                     survey_response <- survey_response_map["form1"]
+                    is_more_tired_condition <- (survey_response_map["form1"][[1]] >= survey_response_map["form2"][[1]])
                 } else {
                     survey_response <- survey_response_map["form2"]
+                    is_more_tired_condition <- (survey_response_map["form2"][[1]] > survey_response_map["form1"][[1]])
                 }
                 read_in_csv <- read_csv(paste0("data/", person, "/", csv))
-                processed_csv <- preprocess(read_in_csv, survey_response[[1]], csv_is_morning, morning_first, person)
+                processed_csv <- preprocess(read_in_csv, survey_response[[1]], csv_is_morning, morning_first, is_more_tired_condition, person)
                 all_data[[length(all_data) + 1]] <- processed_csv
             }
         }
@@ -99,7 +103,7 @@ summary(tod_reg)
 ```{r}
 # Mixed effect modeling illustrating random and fixed effects of outcome,
 # transition, task run, and tiredness on stay.
-tiredness_reg <- glmer(stay ~ outcome*transition*(task_run + tiredness) + (1 + (outcome*transition) || subject), data = all_data_concat, family = binomial)
+tiredness_reg <- glmer(stay ~ outcome*transition*(task_run + tiredness) + (1 | subject), data = all_data_concat, family = binomial)
 summary(tiredness_reg)
 ```
 
@@ -181,9 +185,10 @@ stay_bar_plot_creator <- function(bars_to_plot, title) {
   ggplot(data, aes(fill = transition, y = value, x = reward_type)) +
       geom_bar(position = "dodge", stat = "identity") + 
       labs(y= "Stay Probability", x = "Reward Condition", title = title) +
+      coord_cartesian(ylim = c(.5, max(value) + max(se))) +
       theme(plot.title = element_text(hjust = 0.5)) +
       geom_errorbar(aes(ymin=value-se, ymax=value+se),
-                  width=.2,                    # Width of the error bars
+                  width=.2,                    
                   position=position_dodge(.9))
 }
 ```
@@ -227,9 +232,10 @@ second_run_data <- all_data %>%
 stay_bar_plot_creator(bp_val_averger(second_run_data), "Stay Probability : Second Task Run Condition")
 ```
 
+# Tiredness Plotting Method 1: Tiredness Scores
 ```{r}
 tired_data <- all_data %>%
-    list.filter(attr(., "tiredness") <= 0) %>%
+    list.filter(attr(., "tiredness") >= 0) %>%
     map(stay_probability_computer)
 
 stay_bar_plot_creator(bp_val_averger(tired_data), "Stay Probability : Tired Condition")
@@ -237,8 +243,24 @@ stay_bar_plot_creator(bp_val_averger(tired_data), "Stay Probability : Tired Cond
 
 ```{r}
 awake_data <- all_data %>%
-    list.filter(attr(., "tiredness") > 0) %>%
+    list.filter(attr(., "tiredness") < 0) %>%
     map(stay_probability_computer)
 
 stay_bar_plot_creator(bp_val_averger(awake_data), "Stay Probability : Awake Condition")
+```
+
+# Tiredness Plotting Method 2: Relative Tiredness between Trials
+```{r}
+relatively_tired_data <- all_data %>%
+    list.filter(attr(., "is_more_tired_condition") == TRUE) %>%
+    map(stay_probability_computer)
+
+stay_bar_plot_creator(bp_val_averger(relatively_tired_data), "Stay Probability : Tired Condition")
+```
+```{r}
+relatively_awake_data <- all_data %>%
+    list.filter(attr(., "is_more_tired_condition") == FALSE) %>%
+    map(stay_probability_computer)
+
+stay_bar_plot_creator(bp_val_averger(relatively_awake_data), "Stay Probability : Awake Condition")
 ```
