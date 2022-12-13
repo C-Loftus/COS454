@@ -15,12 +15,3 @@ A space-themed version of the two-step task.
 - Nussenbaum, K., Scheuplein, M., Phaneuf, C. V., Evans, M. D., & Hartley, C. A. (2020). Moving developmental research online: Comparing in-lab and web-based studies of model-based reinforcement learning. Collabra: Psychology, 6(1).
 
 https://www.princeton.edu/~ndaw/d10.pdf
-
-<!-- # outcome is model free
-win stay lose shift -->
-
-<!-- outcome:transition interaction is model-based effect -->
-
-<!-- show bar plot, compute proportions separately for each task run. Avg proportions within person and then within the whole group -->
-
-<!-- we had to prune the model for unnecessary variables to get a better fit -->
