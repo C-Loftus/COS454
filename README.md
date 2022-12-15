@@ -1,17 +1,12 @@
-# Two-step
+# The Influence of Fatigue on Usage of Model-Based vs Model-Free Reinforcement Learning Strategies
 
-### Customize for the experiment
+This repository holds the data, modeling code, and writeup for our final project for COS454, Computation Models of Cognition. Authors: Colton Loftus, Maya Rozenshteyn
 
-`const instructions_04` defines the final experiment instructions
+### Abstract
 
-Author(s): Sam Zorowitz, Gili Karni, Branson Byers
+Cognitive models often assume that humans optimize tasks in a generally rational manner. Analyzing human task-related behavior under a state of fatigue, however, may challenge these assumptions of rationality. Physical and mental fatigue may alter not only task performance but also fundamental approaches to task-solving. This paper explores behavior during the two-stage Markov decision task completed under conditions of differing fatigue. Analysis of fatigue-modulated behavior in this task illustrates statistically significant differences in people's use of model-based versus model-free reinforcement learning strategies depending on fatigue level. Specifically, decreased fatigue results in decreased usage of both model-based and model-free strategies.
 
-A space-themed version of the two-step task.
+### References
 
-## References
-
-- Daw, N. D., Gershman, S. J., Seymour, B., Dayan, P., & Dolan, R. J. (2011). Model-based influences on humans' choices and striatal prediction errors. Neuron, 69(6), 1204-1215.
-- Decker, J. H., Otto, A. R., Daw, N. D., & Hartley, C. A. (2016). From creatures of habit to goal-directed learners: Tracking the developmental emergence of model-based reinforcement learning. Psychological science, 27(6), 848-858.
-- Nussenbaum, K., Scheuplein, M., Phaneuf, C. V., Evans, M. D., & Hartley, C. A. (2020). Moving developmental research online: Comparing in-lab and web-based studies of model-based reinforcement learning. Collabra: Psychology, 6(1).
-
-https://www.princeton.edu/~ndaw/d10.pdf
+All references and related work for this project can be sound in [our bibliography](./references.bib)
+Our two-step task code is a modified version of the implementation by the Princeton University Nivlab (Author(s): Sam Zorowitz, Gili Karni, Branson Byers) found [here](https://github.com/nivlab/jspsych-demos/tree/main/tasks/two-step)

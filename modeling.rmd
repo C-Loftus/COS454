@@ -1,3 +1,30 @@
+---
+title: "The Influence of Fatigue on Usage of Model-Based vs Model-Free Reinforcement Learning Strategies"
+subtitle: 
+author: 'Colton Loftus, Maya Rozenshteyn'
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    dev: png
+    fig_caption: yes
+    toc: yes
+    toc_depth: 3
+  html_document:
+    df_print: paged
+    toc: yes
+geometry: margin=1in
+fontsize: 10pt
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align="center", fig.height=6, fig.width=8, collapse=T, comment="", prompt=F, echo = T, cache=T, autodep=T, tidy=F, tidy.opts=list(width.cutoff=63), dev='png')
+options(width=63)
+
+```
+
 ```{r}
 setwd("./")
 
@@ -57,7 +84,7 @@ preprocess <- function(csv, survey_string, is_morning, morning_first, is_more_ti
 }
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 all_data <- list()
 # Read in and preprocess experimental data.
 for (person in list.files("data/")) {
@@ -83,7 +110,6 @@ for (person in list.files("data/")) {
 }
 
 all_data_concat <- bind_rows(all_data) %>% mutate(transition = transition - mean(transition))
-all_data_concat
 ```
 
 ```{r}
@@ -257,6 +283,7 @@ relatively_tired_data <- all_data %>%
 
 stay_bar_plot_creator(bp_val_averger(relatively_tired_data), "Stay Probability : Tired Condition")
 ```
+
 ```{r}
 relatively_awake_data <- all_data %>%
     list.filter(attr(., "is_more_tired_condition") == FALSE) %>%
